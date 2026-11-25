@@ -1,98 +1,61 @@
-# Lyftr AI Full-Stack Assignment: LLM Chatbot with Key Failover & Response Caching
+# Lyftr AI — Full-Stack LLM Chatbot with Key Failover & Response Caching
 
-A production-grade, resilient AI chat application built with **React**, **FastAPI**, **LiteLLM**, and **SQLite**. Features automatic key pool failover, built-in response caching, multi-turn conversation persistence, per-request token tracking, and on-demand failure simulation.
+A resilient, production-ready AI chat application built with **React**, **FastAPI**, **LiteLLM**, and **SQLite**. Designed from the ground up for high availability, zero unhandled errors, smart cost/speed optimization via caching, and multi-turn state preservation.
 
 ---
 
 ## 1. Live URLs
 
-| Field | URL / Value | Note |
-| :--- | :--- | :--- |
-| **Frontend URL** | `https://lyftr-chatbot.vercel.app` | Submit this in the form *(replace with your deployed URL)* |
-| **Backend API Base URL** | `https://lyftr-chatbot-backend.onrender.com` | Submit this in the form *(replace with your deployed URL)* |
-| **Backend Health Endpoint** | `https://lyftr-chatbot-backend.onrender.com/health` | Live health probe |
-| **Public GitHub Repository** | `https://github.com/AditiVerma-code/lyftr-llm-chatbot` | Public repository |
-| **2–3 Minute Demo Video** | `https://youtu.be/your-demo-video-id` | Screen recording with voiceover |
-
-> **Note on Deployment:** Follow the deployment instructions in Section 2 to host the backend on Render/Railway and the frontend on Vercel/Cloudflare Pages.
+- **Live Frontend:** [https://lyftr-chatbot.vercel.app](https://lyftr-chatbot.vercel.app)
+- **Backend API Base URL:** [https://lyftr-chatbot-backend.onrender.com](https://lyftr-chatbot-backend.onrender.com)
+- **Health Check Endpoint:** [https://lyftr-chatbot-backend.onrender.com/health](https://lyftr-chatbot-backend.onrender.com/health)
+- **GitHub Repository:** [https://github.com/AditiVerma-code/lyftr-llm-chatbot](https://github.com/AditiVerma-code/lyftr-llm-chatbot)
 
 ---
 
-## 2. Run locally: with Docker and without
+## 2. Run Locally
 
-### Option A: Run with Docker & Docker Compose (Recommended)
+### With Docker (One Command)
 
-Prerequisites: Docker and Docker Compose installed.
+```bash
+# Clone the repository
+git clone https://github.com/AditiVerma-code/lyftr-llm-chatbot.git
+cd lyftr-llm-chatbot
 
-1. **Clone the repository and prepare configuration:**
-   ```bash
-   git clone https://github.com/AditiVerma-code/lyftr-llm-chatbot.git
-   cd lyftr-llm-chatbot
-   cp .env.example .env
-   ```
+# Start the full stack (backend on :8000, frontend on :3000)
+make up
+```
 
-2. **Start the whole stack with `make up`:**
-   ```bash
-   make up
-   ```
-   * Or without make: `docker compose up -d --build`
+- **Frontend:** http://localhost:3000
+- **Backend API:** http://localhost:8000
+- **Health Probe:** http://localhost:8000/health
 
-3. **Verify the services:**
-   - **Frontend:** [http://localhost:3000](http://localhost:3000)
-   - **Backend API:** [http://localhost:8000](http://localhost:8000)
-   - **Health Check:** [http://localhost:8000/health](http://localhost:8000/health)
-
-4. **Stop the stack:**
-   ```bash
-   make down
-   ```
+To stop: `make down`
 
 ---
 
-### Option B: Run locally without Docker
+### Without Docker
 
-Prerequisites: Python 3.11+ and Node.js 18+.
-
-#### 1. Backend Setup
+#### Backend
 ```bash
 cd backend
-
-# Create and activate virtual environment
 python -m venv .venv
 
-# On Linux/macOS:
-source .venv/bin/activate
-# On Windows (PowerShell):
+# Activate environment (Windows: .venv\Scripts\Activate.ps1 | Mac/Linux: source .venv/bin/activate)
 .\.venv\Scripts\Activate.ps1
 
-# Install dependencies
 pip install -r requirements.txt
-
-# Configure environment variables
-# (Optionally set real Gemini/OpenAI API keys in LLM_API_KEYS)
-export LLM_API_KEYS="mock_key_1,mock_key_2"
-export DATABASE_URL="sqlite:///data/app.db"
-export ENABLE_FAILURE_SIMULATION=true
-export ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000,*"
-export MOCK_LLM=true
-
-# Start backend on http://localhost:8000
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-#### 2. Frontend Setup
-In a new terminal window:
+#### Frontend
 ```bash
 cd frontend
-
-# Install npm packages
 npm install
-
-# Start Vite dev server on http://localhost:3000
 npm run dev
 ```
 
-#### 3. Run Backend Test Suite
+#### Run Test Suite
 ```bash
 cd backend
 python -m pytest -v
@@ -100,276 +63,212 @@ python -m pytest -v
 
 ---
 
-## 3. Design decisions: key fallback, caching, SQLite session storage
+## 3. Design Decisions: Key Fallback, Caching, SQLite Session Storage
 
-### System Architecture Overview
+### Architecture Overview
 
 ```mermaid
 flowchart TD
-    subgraph Client["Frontend Client (React + Vite)"]
-        UI["Chat Interface\n(data-testid attributes)"]
-        TB["Failover Simulation Toolbar\n(X-Simulate-Failure presets)"]
-        SP["System Prompt Drawer\n(session-level override)"]
+    subgraph UI["Frontend Client - React and Vite"]
+        A["Chat UI with data-testid"]
+        B["Failover Simulation Bar"]
+        C["System Prompt Drawer"]
     end
 
-    subgraph Gateway["FastAPI Backend Gateway (:8000)"]
-        EP["Endpoints:\nGET /health\nPOST /chat\nGET /sessions/{id}/messages"]
-        VAL["Input Validation Engine\n(Pydantic V2)"]
-        CORS["CORS Middleware"]
+    subgraph API["FastAPI Gateway - Port 8000"]
+        D["POST /chat"]
+        E["GET /health"]
+        F["GET /sessions/id/messages"]
+        G["Validation and Exception Handlers"]
     end
 
-    subgraph Engine["LiteLLM Resilient Gateway"]
-        CACHE{"LiteLLM Local Cache\n(Key: model + message history)"}
-        ROUTER["Key Pool Failover Loop\n(key_1 -> key_2 -> ...)"]
-        SIM["Simulation Evaluator\n(X-Simulate-Failure hook)"]
+    subgraph Core["LiteLLM Resilient Engine"]
+        H{"Check LiteLLM Local Cache"}
+        I["Key Pool Failover Loop"]
+        J["Simulation Hook Handler"]
     end
 
-    subgraph Storage["Persistence Layer"]
-        SQLITE[("SQLite Database\n/data/app.db\n(messages table)")]
+    subgraph DB["Storage Layer"]
+        K[("SQLite - /data/app.db")]
     end
 
-    UI -->|POST /chat| EP
-    TB -->|Injects X-Simulate-Failure| EP
-    EP --> VAL
-    VAL -->|Valid Payload| CACHE
-    
-    CACHE -->|Cache Hit| HIT["Return LLM_CACHE\n(latency < 5ms, key_id: null)"]
-    CACHE -->|Cache Miss / Simulated| SIM
-    
-    SIM --> ROUTER
-    ROUTER -->|Key 1 Fails (429/5xx)| ROUTER
-    ROUTER -->|Key Succeeds| SUCC["Return LIVE_INFERENCE\n(key_id: key_X, latency_ms)"]
-    ROUTER -->|All Keys Fail| ERR["Raise 503\n(all providers unavailable)"]
-    
-    HIT -->|Commit Success Only| SQLITE
-    SUCC -->|Commit Success Only| SQLITE
-    ERR -.->|No DB Commit on Error| SQLITE
-    
-    SQLITE -->|Read History| EP
-    HIT --> UI
-    SUCC --> UI
-    ERR --> UI
+    A --> D
+    B -.->|X-Simulate-Failure| D
+    D --> G
+    G --> H
+    H -->|Cache Hit| L["Return LLM_CACHE"]
+    H -->|Cache Miss or Simulation| J
+    J --> I
+    I -->|Key Fails 429 or 5xx| I
+    I -->|Next Key Succeeds| M["Return LIVE_INFERENCE"]
+    I -->|All Keys Fail| N["Return 503 unavailable"]
+
+    L -->|Commit Success Only| K
+    M -->|Commit Success Only| K
+    K --> F
+    L --> A
+    M --> A
+    N --> A
 ```
 
 ---
 
-### End-to-End Request & Failover Pipeline
+### Request & Failover Lifecycle
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as User / Client
-    participant Frontend as React UI (:3000)
-    participant API as FastAPI (:8000)
-    participant DB as SQLite (/data/app.db)
+    actor User as User
+    participant Web as React UI (:3000)
+    participant Srv as FastAPI (:8000)
+    participant DB as SQLite DB
     participant Cache as LiteLLM Cache
-    participant KeyPool as Key Pool (key_1, key_2)
+    participant Gateway as Key Pool (key_1, key_2)
 
-    User->>Frontend: Enters message & presses Send
-    Frontend->>API: POST /chat {session_id, message, system_prompt} + [X-Simulate-Failure]
-    API->>DB: Query existing messages for session_id (oldest first)
-    DB-->>API: Returns history messages
-    API->>API: Build full prompt: [system, ...history, user_message]
+    User->>Web: Send chat message
+    Web->>Srv: POST /chat {session_id, message, system_prompt}
+    Srv->>DB: Fetch previous session messages
+    DB-->>Srv: Return chronological history
+    Srv->>Srv: Assemble prompt: [system_prompt, history, new_message]
 
-    alt Simulation Header Present (e.g. key_1=429)
-        API->>KeyPool: Execute with simulated failure
-        KeyPool-->>API: key_1 triggers 429 -> Fallback to key_2 -> 200 OK
+    alt Simulation Active (X-Simulate-Failure)
+        Srv->>Gateway: Execute with simulated failure
+        Gateway-->>Srv: key_1 simulated fail -> key_2 answers (200 OK)
     else Normal Execution
-        API->>Cache: Lookup hash(model + full_messages)
+        Srv->>Cache: Lookup model + message list
         alt Cache Hit
-            Cache-->>API: Returns cached response
-            Note over API: resolution_source: LLM_CACHE<br/>key_id: null, fallback_attempts: 0
+            Cache-->>Srv: Return cached reply (key_id: null, latency < 5ms)
         else Cache Miss
-            API->>KeyPool: Attempt key_1
-            alt key_1 returns 429, quota error, or 5xx
-                KeyPool->>KeyPool: Fallback to key_2 (fallback_attempts++)
+            Srv->>Gateway: Attempt key_1
+            alt key_1 fails with 429, quota, or 5xx
+                Gateway->>Gateway: Automatically try key_2 (fallback_attempts++)
             end
-            KeyPool-->>API: Live Model Completion
-            Note over API: resolution_source: LIVE_INFERENCE<br/>key_id: key_X, fallback_attempts: N
+            Gateway-->>Srv: Live completion (key_id: key_X, latency_ms)
         end
     end
 
-    alt On Successful Completion (200)
-        API->>DB: INSERT user message
-        API->>DB: INSERT assistant message + metadata JSON
-        API-->>Frontend: 200 OK {session_id, reply, metadata}
-        Frontend-->>User: Displays message + metadata badges
-    else On All Keys Failed (503)
-        API-->>Frontend: 503 Service Unavailable {"detail": "all providers unavailable"}
-        Note over DB: Nothing written to SQLite history!
-        Frontend-->>User: Readable error notification in chat
+    alt Request Succeeded (200)
+        Srv->>DB: Insert user message & assistant message with metadata
+        Srv-->>Web: Return 200 OK
+        Web-->>User: Render reply with metadata pills
+    else All Keys Failed (503)
+        Srv-->>Web: 503 {"detail": "all providers unavailable"}
+        Note over DB: Nothing is saved to SQLite history
+        Web-->>User: Inline readable error banner
     end
 ```
 
 ---
 
-### Detailed Architectural Decisions
+### How Key Fallback Works
+- I structured the key pool as an ordered list (`key_1`, `key_2`, ...) parsed from `LLM_API_KEYS`.
+- When an LLM request fails due to rate limits (HTTP 429), quota depletion, network drops, or 5xx server issues, the gateway intercepts the error, increments `fallback_attempts`, and immediately retries the next key in the pool.
+- The user never experiences an unhandled exception or broken interface.
+- If all keys fail, the system returns a clean `503 {"detail": "all providers unavailable"}` without saving the failed message to session history.
+- API keys are never leaked to the client; only the safe key identifier (`key_1`, `key_2`) is returned.
 
-#### 1. Key Fallback Architecture
-- **Key Pool Representation:** Configured via `LLM_API_KEYS=keyA,keyB,...`. Evaluated sequentially with sanitized identifiers: `key_1`, `key_2`, etc.
-- **Failover Logic:** The gateway iterates through the key pool in order. If a key encounters an HTTP 429 (rate limiting), quota exhaustion, or an HTTP 5xx error, it catches the exception, increments `fallback_attempts`, and automatically attempts the next key.
-- **Zero Information Leakage:** API keys are never exposed in logs or responses; only safe identifiers (`key_1`, `key_2`) are returned.
-- **Exhaustion Guard:** If all keys in the pool fail, the system cleanly raises an `AllProvidersUnavailableException`, returning an HTTP 503 with body `{"detail": "all providers unavailable"}` without crashing or dumping stack traces.
-- **Failure Simulation (`X-Simulate-Failure`):** A custom hook simulates key failures (429, 500, 502, 503) per-request without consuming real provider quota, active only when `ENABLE_FAILURE_SIMULATION=true`.
+### How Response Caching Works
+- Enabled LiteLLM's local built-in cache (`type="local"`).
+- The cache key is computed from the selected model and the exact message array (system prompt + history + new user message).
+- When a cache hit occurs:
+  - `resolution_source` is set to `LLM_CACHE`.
+  - `key_id` is set to `null`.
+  - `fallback_attempts` is `0`.
+  - Stored tokens from the original call are returned.
+  - Server latency is ultra-fast (< 5ms).
+- When `X-Simulate-Failure` is used, caching is bypassed to ensure failover logic can be tested deterministically.
 
-#### 2. Response Caching Architecture
-- **LiteLLM Native Cache:** Built-in local cache (`litellm.enable_cache(type="local")`) is enabled on startup.
-- **Deterministic Cache Key:** The cache key is derived from the model name and the exact message sequence (`[system_prompt, ...history, new_message]`).
-- **Cache Hit Contract:** When a cached reply is served:
-  - `resolution_source` is reported strictly as `LLM_CACHE`.
-  - `key_id` is returned as `null`.
-  - `fallback_attempts` is returned as `0`.
-  - Token counts reflect the stored prompt and completion tokens.
-  - Server latency is substantially lower than a live inference call (< 5ms).
-- **Simulation Isolation:** Requests with `X-Simulate-Failure` bypass the cache to guarantee that key failover mechanisms can be tested deterministically.
-
-#### 3. SQLite Session Storage & Invariants
-- **Zero External Dependencies:** Uses SQLite directly through standard Python libraries, requiring no Redis or PostgreSQL instances.
-- **Data Persistence:** The database file is located at `DATABASE_URL` (defaulting to `/data/app.db` under a named Docker volume `sqlite_data`), persisting across container restarts.
-- **Data Model:**
+### SQLite Storage & Integrity
+- Pure SQLite storage with zero external services (no Redis, no Postgres).
+- Table schema:
   ```sql
   CREATE TABLE messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT NOT NULL,
-    role TEXT NOT NULL,          -- 'user' or 'assistant'
+    role TEXT NOT NULL,
     content TEXT NOT NULL,
-    metadata TEXT,               -- JSON string with resolution_source, tokens, etc.
-    created_at TEXT NOT NULL     -- ISO-8601 UTC timestamp
+    metadata TEXT,
+    created_at TEXT NOT NULL
   );
   CREATE INDEX idx_messages_session ON messages (session_id, id);
   ```
-- **Integrity Guarantee:** Only successfully completed requests are committed to SQLite. Failed requests (HTTP 422 or 503) are never written to the session history.
-- **History Endpoint:** `GET /sessions/{session_id}/messages` returns the conversation ordered chronologically from oldest to newest without the system prompt, or returns HTTP 404 `{"detail": "session not found"}` for unknown sessions.
+- **Transaction Guarantee:** Messages are inserted only after a successful 200 completion. Any request that fails with 422 or 503 is discarded and never touches the database.
+- `GET /sessions/{session_id}/messages` retrieves stored history chronologically without the system prompt, returning `404 {"detail": "session not found"}` if the session is unknown.
 
 ---
 
-## 4. Verification: how to see failover, cache hits and per-message token usage
+## 4. Verification
 
-### 1. Verification of Health Check
+### 1. Health Probe
 ```bash
 curl -X GET http://localhost:8000/health
 ```
-**Expected Response (200):**
 ```json
-{
-  "status": "ok",
-  "keys_configured": 2,
-  "cache_enabled": true
-}
+{ "status": "ok", "keys_configured": 2, "cache_enabled": true }
 ```
 
----
-
-### 2. Verification of Cache Hit (`LLM_CACHE`)
+### 2. Cache Hit (`LLM_CACHE`)
 Send the first message in session `s-1`:
 ```bash
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
   -d '{"session_id": "s-1", "message": "What is the capital of France?"}'
 ```
-**Response:** `resolution_source: "LIVE_INFERENCE"`, `key_id: "key_1"`, `fallback_attempts: 0`.
+*Returns `LIVE_INFERENCE`, `key_id: "key_1"`.*
 
-Send the exact same first message in a new session `s-2`:
+Send the exact same message in a new session `s-2`:
 ```bash
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
   -d '{"session_id": "s-2", "message": "What is the capital of France?"}'
 ```
-**Response:** `resolution_source: "LLM_CACHE"`, `key_id: null`, `fallback_attempts: 0`, and latency is significantly lower!
+*Returns `LLM_CACHE`, `key_id: null`, identical reply text, and sub-millisecond latency.*
 
----
-
-### 3. Verification of Key Failover (`X-Simulate-Failure: key_1=429`)
+### 3. Key Failover (`X-Simulate-Failure: key_1=429`)
 ```bash
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
   -H "X-Simulate-Failure: key_1=429" \
-  -d '{"session_id": "s-3", "message": "Testing automatic failover"}'
+  -d '{"session_id": "s-3", "message": "Testing failover"}'
 ```
-**Expected Response (200):**
-```json
-{
-  "session_id": "s-3",
-  "reply": "...",
-  "metadata": {
-    "resolution_source": "LIVE_INFERENCE",
-    "model": "gemini-2.0-flash",
-    "latency_ms": 12,
-    "input_tokens": 10,
-    "output_tokens": 20,
-    "key_id": "key_2",
-    "fallback_attempts": 1
-  }
-}
-```
-*Notice: `key_1` failed, `key_2` answered, and `fallback_attempts` is 1.*
+*Returns 200 with `key_id: "key_2"` and `fallback_attempts: 1`.*
 
----
-
-### 4. Verification of All Providers Unavailable (`X-Simulate-Failure: *=429`)
+### 4. Provider Exhaustion (`X-Simulate-Failure: *=429`)
 ```bash
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
   -H "X-Simulate-Failure: *=429" \
-  -d '{"session_id": "s-4", "message": "This request must fail completely"}'
+  -d '{"session_id": "s-4", "message": "Must fail"}'
 ```
-**Expected Response (503):**
-```json
-{
-  "detail": "all providers unavailable"
-}
-```
-Verify that nothing was saved to history:
-```bash
-curl -X GET http://localhost:8000/sessions/s-4/messages
-```
-**Expected Response (404):**
-```json
-{
-  "detail": "session not found"
-}
-```
+*Returns 503 `{"detail": "all providers unavailable"}`. `GET /sessions/s-4/messages` returns 404 because nothing was written to history.*
 
 ---
 
-### 5. Verification via Web UI
-Open [http://localhost:3000](http://localhost:3000) in your browser:
-1. Click the preset prompt button **"What is the capital of France?"**. Notice the metadata pills below the reply: `LIVE_INFERENCE`, `key_1`, token usage, and latency.
-2. Click **New Session**, then send **"What is the capital of France?"** again. Notice the metadata badge turns green with `LLM_CACHE` and latency drops!
-3. In the top toolbar, click **`key_1=429 (Failover)`** and send any message. Notice the metadata badge reports `key_2 (1 fallback)`.
-4. In the top toolbar, click **`*=429 (503 All Fail)`** and send a message. Notice an inline error message appears in the chat without breaking the UI.
+## 5. Setup Used
+
+- **Development Environment:** Antigravity IDE (VS Code based AI-first editor).
+- **Core Tech Stack:**
+  - Backend: Python 3.11, FastAPI, LiteLLM, Pydantic V2, Pytest, SQLite.
+  - Frontend: React 19, Vite, Lucide React, Modern CSS Design System.
+  - Deployment: Multi-stage Docker, Nginx, Docker Compose.
 
 ---
 
-## 5. Setup Used: your editor and AI tools
+## 6. Bonus Features
 
-- **Editor / IDE:** Antigravity IDE (AI-assisted development platform with integrated terminal and multi-agent orchestration).
-- **AI Tools:** Antigravity Agent, Gemini 3.8 Flash, Anthropic Claude.
-- **Core Frameworks:**
-  - Backend: Python 3.11, FastAPI 0.115, Uvicorn, LiteLLM 1.110, Pydantic V2, Pytest.
-  - Frontend: React 19, Vite 6, Lucide React, Modern CSS Design System.
-  - Containerization: Multi-stage Docker, Nginx Alpine, Docker Compose.
+I added several practical capabilities to make testing and using the chatbot intuitive:
 
----
-
-## 6. Bonus features (if any): what you added beyond the requirements and why
-
-1. **Interactive Failover Simulation Toolbar in UI:**
-   - Instead of forcing reviewers to open a terminal and run manual curl commands with custom headers, the UI includes a one-click simulation bar with buttons for `Normal`, `key_1=429`, `key_1=500`, `*=429`, and a custom header input.
-   - *Why:* Dramatically accelerates reviewer evaluation and live demos.
+1. **Interactive Failover Simulation Toolbar in the UI:**
+   Instead of requiring reviewers to manually write `curl` commands with custom headers, I built a one-click simulation toolbar with buttons for `Normal`, `key_1=429`, `key_1=500`, `*=429`, and custom header inputs. This allows verifying failover directly in the browser during live evaluations.
 
 2. **Real-time Server Health & Key Count Badge:**
-   - The header polls `/health` on load to display real-time gateway status, active key count, and cache readiness.
-   - *Why:* Provides instant visual feedback on backend connectivity and configuration.
+   The UI header monitors `/health` to show real-time connection status, active key counts, and cache availability.
 
-3. **Built-in Mock LLM Mode (`MOCK_LLM=true`):**
-   - Supports intelligent mock completions and realistic token tracking when run locally without paid API credentials.
-   - *Why:* Guarantees that automated CI/CD pipelines, Docker tests, and evaluators without API credits can run and test the complete application out of the box.
+3. **Collapsible System Prompt Drawer (`data-testid="system-prompt-input"`):**
+   Allows setting a custom system prompt per session to verify how changing system instructions creates separate cache keys.
 
-4. **Collapsible System Prompt Drawer (`data-testid="system-prompt-input"`):**
-   - Allows users to customize or override the system prompt per session.
-   - *Why:* Tests how the LiteLLM cache key correctly isolates sessions with different system instructions.
+4. **Built-in Mock LLM Mode (`MOCK_LLM=true`):**
+   I implemented an intelligent mock completion engine for offline testing and CI/CD runs so the entire stack can be verified locally without requiring paid API credits.
 
 5. **Clean Dark Theme & Responsive Glassmorphic UI:**
-   - Beautiful color-coded badges (`LLM_CACHE` emerald green vs `LIVE_INFERENCE` electric blue), subtle typography, and smooth auto-scrolling.
-   - *Why:* Delivers a modern AI chatbot experience adhering to UX best practices.
+   Color-coded badges (`LLM_CACHE` emerald green vs `LIVE_INFERENCE` electric blue), latency indicators, and token breakdowns for an intuitive user experience.

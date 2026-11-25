@@ -14,7 +14,12 @@ import {
   Sliders
 } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ||
+  (typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:8000'
+    : 'https://lyftr-chatbot-backend.onrender.com');
 
 function generateSessionId() {
   const rand = Math.random().toString(36).substring(2, 10);
